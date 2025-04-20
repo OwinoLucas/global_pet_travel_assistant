@@ -28,7 +28,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class LoginSerializer(TokenObtainPairSerializer):
+    username_field = 'email'  # Change the username field to email
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'] = serializers.EmailField()
+        self.fields.pop('username', None)  # Remove the username field
+    
     def validate(self, attrs):
+        # Convert email to username for the parent class
+        attrs['username'] = attrs.pop('email')
         data = super().validate(attrs)
         data["user"] = {
             "id": self.user.id,

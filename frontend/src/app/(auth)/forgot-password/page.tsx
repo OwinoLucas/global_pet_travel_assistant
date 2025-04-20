@@ -1,168 +1,166 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppDispatch } from '@/lib/redux/hooks';
-import { startAuth, authFailed } from '@/lib/redux/slices/authSlice';
-import Button from '@/components/ui/Button';
-import { apiSlice } from '@/lib/api/apiSlice';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Loader2 } from 'lucide-react';
 
-// Create a new API endpoint for requesting password reset
-const forgotPasswordApi = apiSlice.injectEndpoints({
-  endpoints: (builder) => ({
-    requestPasswordReset: builder.mutation<{ detail: string }, { email: string }>({
-      query: (data) => ({
-        url: '/api/auth/password-reset/',
-        method: 'POST',
-        body: data,
-      }),
-      transformErrorResponse: (response: any) => {
-        return {
-          status: response.status,
-          message: response.data?.detail || 'Failed to request password reset. Please try again.',
-        };
-      },
-    }),
-  }),
+// Form validation schema
+const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, { message: 'Email is required' })
+    .email({ message: 'Please enter a valid email address' }),
 });
 
-export const { useRequestPasswordResetMutation } = forgotPasswordApi;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
-/**
- * Forgot Password Page Component
- * 
- * Provides a form for users to request a password reset
- */
-export default function ForgotPasswordPage() {
-  const dispatch = useAppDispatch();
-  const [requestPasswordReset, { isLoading }] = useRequestPasswordResetMutation();
-
-  // Form state
-  const [email, setEmail] = useState('');
+const ForgotPasswordPage: React.FC = () => {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitSuccessful, setIsSubmitSuccessful] = useState(false);
   
-  // UI states
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  /**
-   * Handle form submission
-   */
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    // Reset states
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    // Validate email
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-      setErrorMessage('Please enter a valid email address');
-      return;
-    }
-
+  // React Hook Form
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: '',
+    },
+  });
+  
+  const onSubmit = async (data: ForgotPasswordFormValues) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    
     try {
-      // Start loading state
-      dispatch(startAuth());
-
-      // Call API to request password reset
-      const result = await requestPasswordReset({ email }).unwrap();
-
-      // Show success message
-      setSuccessMessage(
-        result.detail || 
-        'If an account exists for this email, you will receive password reset instructions.'
-      );
-      setSubmitted(true);
+      // In a real application, this would be an API call to request a password reset
+      // For demo purposes, we're simulating the API call with a timeout
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Simulate success
+      setIsSubmitSuccessful(true);
+      
+      // In a real app, you would show a success message and possibly redirect after a delay
     } catch (error: any) {
-      console.error('Password reset request failed:', error);
-      
-      // Set error message, but don't reveal if the email exists or not for security
-      setErrorMessage(
-        error.message || 
-        'There was a problem processing your request. Please try again later.'
-      );
-      
-      // Set error in Redux
-      dispatch(authFailed(error.message || 'Password reset request failed'));
+      // Handle error responses
+      if (error?.data?.message) {
+        setErrorMessage(error.data.message);
+      } else {
+        setErrorMessage('Failed to send password reset email. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
-
+  
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h1 className="text-3xl font-extrabold text-gray-900">Forgot your password?</h1>
-          <p className="mt-2 text-gray-600">
-            Enter your email address and we'll send you instructions to reset your password.
-          </p>
+    <div className="space-y-6">
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">Forgot Password</h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your email address and we'll send you a link to reset your password
+        </p>
+      </div>
+
+      {/* Success message */}
+      {isSubmitSuccessful ? (
+        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800 border border-green-200">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="font-medium">Password reset email sent!</p>
+              <p className="mt-1">
+                We've sent you an email with instructions to reset your password. Please check your inbox.
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-4 text-center">
+            <Link
+              href="/login"
+              className="font-medium text-primary hover:text-primary-600 hover:underline"
+            >
+              Back to login
+            </Link>
+          </div>
         </div>
+      ) : (
+        <>
+          {/* Error message */}
+          {errorMessage && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          )}
 
-        {errorMessage && (
-          <div className="p-4 mt-4 text-sm text-red-800 bg-red-100 rounded-md">
-            {errorMessage}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="p-4 mt-4 text-sm text-green-800 bg-green-100 rounded-md">
-            {successMessage}
-          </div>
-        )}
-
-        {!submitted ? (
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Email field */}
+            <div className="space-y-2">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Email
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="your@email.com"
+                className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  errors.email ? 'border-destructive' : ''
+                }`}
+                placeholder="name@example.com"
+                {...register('email')}
+                disabled={isLoading}
               />
+              {errors.email && (
+                <p className="text-xs text-destructive mt-1">{errors.email.message}</p>
+              )}
             </div>
 
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                isLoading={isLoading}
-                className="w-full"
-              >
-                Send Reset Link
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="mt-6 text-center">
-            <p className="mb-4">Check your email for the reset link.</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => setSubmitted(false)}
-              className="w-full"
+            {/* Submit button */}
+            <button
+              type="submit"
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isLoading}
             >
-              Try Another Email
-            </Button>
-          </div>
-        )}
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending email...
+                </div>
+              ) : (
+                'Send Reset Link'
+              )}
+            </button>
+          </form>
 
-        <div className="mt-6 text-center">
-          <Link href="/login" className="text-sm font-medium text-blue-600 hover:text-blue-500">
-            Back to sign in
-          </Link>
-        </div>
-      </div>
+          {/* Back to login link */}
+          <div className="mt-4 text-center text-sm">
+            Remember your password?{' '}
+            <Link
+              href="/login"
+              className="font-semibold text-primary hover:text-primary-600 hover:underline"
+            >
+              Back to login
+            </Link>
+          </div>
+        </>
+      )}
     </div>
   );
-}
+};
+
+export default ForgotPasswordPage;
 

@@ -9,7 +9,7 @@ import * as z from 'zod';
 import { Eye, EyeOff, Loader2, Check, X } from 'lucide-react';
 import { useRegisterMutation } from '@/store/api/authApi';
 import { useAppDispatch } from '@/store';
-import { setAuth } from '@/store/features/auth/authSlice';
+import { setCredentials } from '@/store/features/authSlice';
 import { RegisterRequest } from '@/types/auth';
 
 // Password validation requirements
@@ -127,9 +127,10 @@ const RegisterPage: React.FC = () => {
       const response = await registerUser(registerData).unwrap();
       
       // Store auth data in Redux
-      dispatch(setAuth({
+      dispatch(setCredentials({
         user: response.user,
-        tokens: response.tokens,
+        token: response.tokens.access,
+        refresh: response.tokens.refresh,
       }));
       
       // Redirect to dashboard

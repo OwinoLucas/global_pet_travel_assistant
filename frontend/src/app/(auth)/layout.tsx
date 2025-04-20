@@ -13,7 +13,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-primary-50 to-background p-4 md:p-8">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-[500px]">
         <div className="mb-8 flex flex-col items-center justify-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary">
             <PawPrint className="h-6 w-6 text-primary-foreground" />
@@ -24,7 +24,7 @@ export default function AuthLayout({
           </p>
         </div>
         
-        <div className="rounded-lg border border-border bg-card p-6 shadow-md">
+        <div>
           {children}
         </div>
         

@@ -1,94 +1,158 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { AuthResponse, LoginRequest, RegisterRequest, PasswordResetRequest, PasswordResetConfirmRequest } from '@/types/auth';
-import { getStoredTokens } from '@/lib/auth';
+import { api } from '../api';
+import {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  RefreshTokenRequest,
+  RefreshTokenResponse,
+  ChangePasswordRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  UpdateProfileRequest,
+  VerifyEmailRequest,
+  MessageResponse,
+  User
+} from '@/types/auth';
 
-// Auth-related API endpoints
-export const authApi = createApi({
-  reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/`,
-    prepareHeaders: (headers) => {
-      // Get tokens from storage
-      const tokens = getStoredTokens();
-      
-      // Add authorization header if we have a token
-      if (tokens && tokens.access) {
-        headers.set('Authorization', `Bearer ${tokens.access}`);
-      }
-      
-      return headers;
-    },
-  }),
+/**
+ * Authentication API slice with endpoints for auth operations
+ */
+export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    // Login endpoint
-    login: builder.mutation<AuthResponse, LoginRequest>({
+    // Registration endpoint
+    register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (credentials) => ({
-        url: 'login/',
+        url: 'auth/register/',
         method: 'POST',
         body: credentials,
       }),
+      // Invalidate relevant cache tags
+      invalidatesTags: ['Profile'],
     }),
-    
-    // Register endpoint
-    register: builder.mutation<AuthResponse, RegisterRequest>({
-      query: (userData) => ({
-        url: 'register/',
+
+    // Login endpoint
+    login: builder.mutation<AuthResponse, LoginRequest>({
+      query: (credentials) => ({
+        url: 'auth/login/',
         method: 'POST',
-        body: userData,
+        body: credentials,
+      }),
+      // Transform response to store tokens
+      transformResponse: (response: AuthResponse) => {
+        // Store tokens in local storage for persistence
+        if (response.tokens.access) {
+          localStorage.setItem('token', response.tokens.access);
+        }
+        if (response.tokens.refresh) {
+          localStorage.setItem('refreshToken', response.tokens.refresh);
+        }
+        return response;
+      },
+      // Invalidate relevant cache tags
+      invalidatesTags: ['Profile'],
+    }),
+
+    // Token refresh endpoint
+    refreshToken: builder.mutation<RefreshTokenResponse, RefreshTokenRequest>({
+      query: (refreshData) => ({
+        url: 'auth/token/refresh/',
+        method: 'POST',
+        body: refreshData,
+      }),
+      // Transform response to store new token
+      transformResponse: (response: RefreshTokenResponse) => {
+        if (response.access) {
+          localStorage.setItem('token', response.access);
+        }
+        return response;
+      },
+    }),
+
+    // Token verification endpoint
+    verifyToken: builder.mutation<{ valid: boolean }, { token: string }>({
+      query: (tokenData) => ({
+        url: 'auth/token/verify/',
+        method: 'POST',
+        body: tokenData,
       }),
     }),
-    
-    // Refresh token endpoint
-    refreshToken: builder.mutation<{ access: string }, { refresh: string }>({
-      query: (refreshToken) => ({
-        url: 'token/refresh/',
+
+    // Get user profile
+    getProfile: builder.query<User, void>({
+      query: () => 'auth/profile/',
+      providesTags: ['Profile'],
+    }),
+
+    // Update user profile
+    updateProfile: builder.mutation<User, UpdateProfileRequest>({
+      query: (profileData) => ({
+        url: 'auth/profile/',
+        method: 'PATCH',
+        body: profileData,
+      }),
+      invalidatesTags: ['Profile'],
+    }),
+
+    // Change password
+    changePassword: builder.mutation<MessageResponse, ChangePasswordRequest>({
+      query: (passwordData) => ({
+        url: 'auth/profile/change-password/',
         method: 'POST',
-        body: refreshToken,
+        body: passwordData,
       }),
     }),
-    
-    // Verify token endpoint
-    verifyToken: builder.mutation<void, { token: string }>({
-      query: (token) => ({
-        url: 'token/verify/',
-        method: 'POST',
-        body: token,
-      }),
-    }),
-    
+
     // Request password reset
-    requestPasswordReset: builder.mutation<{ detail: string }, PasswordResetRequest>({
+    requestPasswordReset: builder.mutation<MessageResponse, PasswordResetRequest>({
       query: (data) => ({
-        url: 'password/reset/',
+        url: 'auth/password/reset/',
         method: 'POST',
         body: data,
       }),
     }),
-    
+
     // Confirm password reset
-    confirmPasswordReset: builder.mutation<{ detail: string }, PasswordResetConfirmRequest>({
+    confirmPasswordReset: builder.mutation<MessageResponse, PasswordResetConfirmRequest>({
       query: (data) => ({
-        url: 'password/reset/confirm/',
+        url: 'auth/password/reset/confirm/',
         method: 'POST',
         body: data,
       }),
     }),
-    
-    // Get current user profile
-    getProfile: builder.query<any, void>({
-      query: () => 'profile/',
+
+    // Verify email
+    verifyEmail: builder.mutation<MessageResponse, VerifyEmailRequest>({
+      query: (data) => ({
+        url: 'auth/verify-email/',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+
+    // Logout (client-side only)
+    logout: builder.mutation<void, void>({
+      queryFn: () => {
+        // Remove tokens from storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        return { data: undefined };
+      },
+      invalidatesTags: ['Profile'],
     }),
   }),
 });
 
-// Export hooks for usage in functional components
+// Export hooks for use in components
 export const {
-  useLoginMutation,
   useRegisterMutation,
+  useLoginMutation,
   useRefreshTokenMutation,
   useVerifyTokenMutation,
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useChangePasswordMutation,
   useRequestPasswordResetMutation,
   useConfirmPasswordResetMutation,
-  useGetProfileQuery,
+  useVerifyEmailMutation,
+  useLogoutMutation,
 } = authApi;
-

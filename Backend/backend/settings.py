@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Add this line
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -143,6 +144,28 @@ CORS_ALLOWED_ORIGINS = [
 # Allow credentials (cookies, authorization headers) in cross-origin requests
 CORS_ALLOW_CREDENTIALS = True
 
+# Additional CORS settings for handling preflight requests
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # Swagger settings
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
@@ -185,6 +208,9 @@ SIMPLE_JWT = {
 
 # Add authentication app to INSTALLED_APPS
 INSTALLED_APPS += ['authentication']
+
+# Custom user model
+AUTH_USER_MODEL = 'authentication.CustomUser'
 
 
 

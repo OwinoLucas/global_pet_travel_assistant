@@ -1,222 +1,310 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { useDispatch, useSelector } from 'react-redux';
+import { setCredentials } from '@/store/features/authSlice';
 import { useLoginMutation } from '@/store/api/authApi';
-import { useAppDispatch } from '@/store';
-import { setAuth } from '@/store/features/auth/authSlice';
-import { LoginRequest } from '@/types/auth';
+import { LoginRequest, AuthResponse } from '@/types/auth';
+import { RootState } from '@/store';
+import { handleApiError } from '@/store/api/utils';
+import { Loader2 } from 'lucide-react';
 
-// Form validation schema
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Email is required' })
-    .email({ message: 'Please enter a valid email address' }),
-  password: z
-    .string()
-    .min(1, { message: 'Password is required' }),
-  rememberMe: z.boolean().optional(),
-});
+// Types for login form state
+interface LoginFormState {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+// Types for validation errors
+interface FormErrors {
+  email?: string;
+  password?: string;
+  general?: string;
+}
 
-const LoginPage: React.FC = () => {
-  const router = useRouter();
-  const dispatch = useAppDispatch();
-  const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
-  // RTK Query login mutation
-  const [login, { isLoading }] = useLoginMutation();
-  
-  // React Hook Form
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      rememberMe: true,
-    },
+export default function LoginPage() {
+  // Set up form state
+  const [formData, setFormData] = useState<LoginFormState>({
+    email: '',
+    password: '',
+    rememberMe: false,
   });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [loginError, setLoginError] = useState<string | null>(null);
   
-  const onSubmit = async (data: LoginFormValues) => {
-    setErrorMessage(null);
-    try {
-      // Extract data needed for login
-      const loginData: LoginRequest = {
-        email: data.email,
-        password: data.password,
-      };
-      
-      // Attempt login
-      const response = await login(loginData).unwrap();
-      
-      // Store auth data in Redux
-      dispatch(setAuth({
-        user: response.user,
-        tokens: response.tokens,
-      }));
-      
-      // Redirect to dashboard
+  const router = useRouter();
+  const dispatch = useDispatch();
+  
+  // Get auth state from Redux store
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  
+  // Use the login mutation hook from our API
+  const [login, { isLoading, error: loginApiError }] = useLoginMutation();
+  
+  // If already authenticated, redirect to home page
+  useEffect(() => {
+    if (isAuthenticated) {
       router.push('/');
-    } catch (error: any) {
-      // Handle error responses from API
-      if (error?.data?.detail) {
-        setErrorMessage(error.data.detail);
-      } else if (error?.data?.message) {
-        setErrorMessage(error.data.message);
-      } else if (error?.data?.errors) {
-        // Join all errors into a string
-        const errorMessages = Object.values(error.data.errors)
-          .flat()
-          .join(', ');
-        setErrorMessage(errorMessages);
-      } else {
-        setErrorMessage('Failed to login. Please try again.');
-      }
+    }
+  }, [isAuthenticated, router]);
+  
+  // Handle API errors
+  useEffect(() => {
+    if (loginApiError) {
+      setLoginError(handleApiError(loginApiError));
+    } else {
+      setLoginError(null);
+    }
+  }, [loginApiError]);
+  
+  // Handle input changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    
+    // Update form data with new values
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value,
+    });
+    
+    // Clear errors when field is edited
+    if (errors[name as keyof FormErrors]) {
+      setErrors({
+        ...errors,
+        [name]: undefined,
+      });
     }
   };
   
+  // Validate form fields
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    
+    // Validate email
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    // Validate password
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Clear any previous errors
+    setLoginError(null);
+    
+    try {
+      // Create login request data
+      const loginData: LoginRequest = {
+        email: formData.email,
+        password: formData.password,
+      };
+      
+      // Call the login API
+      const result: AuthResponse = await login(loginData).unwrap();
+      
+      // Update auth state in Redux with the response data
+      dispatch(
+        setCredentials({
+          token: result.tokens.access,
+          refresh: result.tokens.refresh,
+          user: result.user,
+        })
+      );
+      
+      // Redirect to dashboard will happen automatically via useEffect when isAuthenticated changes
+      
+    } catch (error) {
+      // Error is handled by useEffect watching loginApiError
+      console.error('Login error:', error);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">
-          Enter your credentials to sign in to your account
+    <div className="min-h-screen flex flex-col justify-start pt-6 sm:px-6 lg:px-8 bg-muted/30">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <div className="relative h-20 w-20">
+            <Image
+              src="/logo.svg"
+              alt="Global Pet Travel Assistant"
+              fill
+              priority
+              style={{ objectFit: 'contain' }}
+            />
+          </div>
+        </div>
+        
+        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-foreground">
+          Log in to your account
+        </h2>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          Or{' '}
+          <Link href="/register" className="font-medium text-primary hover:text-primary-600">
+            create a new account
+          </Link>
         </p>
       </div>
 
-      {/* Error message */}
-      {errorMessage && (
-        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Email field */}
-        <div className="space-y-2">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-              errors.email ? 'border-destructive' : ''
-            }`}
-            placeholder="name@example.com"
-            {...register('email')}
-            disabled={isLoading}
-          />
-          {errors.email && (
-            <p className="text-xs text-destructive mt-1">{errors.email.message}</p>
-          )}
-        </div>
-
-        {/* Password field */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Password
-            </label>
-            <Link
-              href="/forgot-password"
-              className="text-xs text-primary hover:text-primary-600 hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <div className="relative">
-            <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                errors.password ? 'border-destructive' : ''
-              }`}
-              placeholder="••••••••"
-              {...register('password')}
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="text-xs text-destructive mt-1">{errors.password.message}</p>
-          )}
-        </div>
-
-        {/* Remember me checkbox */}
-        <div className="flex items-center space-x-2">
-          <input
-            id="rememberMe"
-            type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            {...register('rememberMe')}
-            disabled={isLoading}
-          />
-          <label
-            htmlFor="rememberMe"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            Remember me
-          </label>
-        </div>
-
-        {/* Submit button */}
-        <button
-          type="submit"
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <div className="flex items-center justify-center">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Signing in...
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-border">
+          {/* General error message */}
+          {loginError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+              <p>{loginError}</p>
             </div>
-          ) : (
-            'Sign in'
           )}
-        </button>
-      </form>
+          <form className="space-y-6" onSubmit={handleSubmit} method="post" noValidate>
+            {/* Email field */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-foreground">
+                Email address
+              </label>
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  className={`block w-full px-3 py-2 border ${
+                    errors.email ? 'border-red-300' : 'border-border'
+                  } rounded-md focus:outline-none focus:ring-1 focus:ring-primary`}
+                  value={formData.email}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
+              </div>
+            </div>
 
-      {/* Register link */}
-      <div className="mt-4 text-center text-sm">
-        Don&apos;t have an account?{' '}
-        <Link
-          href="/register"
-          className="font-semibold text-primary hover:text-primary-600 hover:underline"
-        >
-          Create an account
-        </Link>
+            {/* Password field */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-foreground">
+                  Password
+                </label>
+                <div className="text-sm">
+                  <Link href="/forgot-password" className="font-medium text-primary hover:text-primary-600">
+                    Forgot your password?
+                  </Link>
+                </div>
+              </div>
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={`block w-full px-3 py-2 border ${
+                    errors.password ? 'border-red-300' : 'border-border'
+                  } rounded-md focus:outline-none focus:ring-1 focus:ring-primary`}
+                  value={formData.password}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Remember me */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="rememberMe"
+                  name="rememberMe"
+                  type="checkbox"
+                  className="h-4 w-4 border-border rounded text-primary focus:ring-primary"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+                <label htmlFor="rememberMe" className="ml-2 block text-sm text-foreground">
+                  Remember me
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 disabled:cursor-not-allowed"
+                disabled={isLoading || !formData.email || !formData.password}
+              >
+                {isLoading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Logging in...
+                  </span>
+                ) : (
+                  'Log in'
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Divider */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            {/* Social login buttons */}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div>
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center py-2 px-4 border border-border rounded-md shadow-sm bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  disabled={isLoading}
+                >
+                  <span>Google</span>
+                </button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center py-2 px-4 border border-border rounded-md shadow-sm bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  disabled={isLoading}
+                >
+                  <span>Apple</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
-};
+}
 
-export default LoginPage;

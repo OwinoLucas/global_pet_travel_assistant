@@ -4,41 +4,57 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
-import { Calendar, ArrowRight } from 'lucide-react';
+import { Calendar, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import type { Status } from '@/components/ui/StatusBadge';
+import { TravelPlan, TravelPlanStatus } from '@/types/travel';
+import { handleApiError } from '@/store/api';
 
-// Travel plan specific statuses
-export type TravelPlanStatus = Extract<
-  Status, 
-  'planning' | 'ready' | 'in_progress' | 'completed' | 'cancelled'
->;
+// Travel plan specific statuses (re-export from our types for consistency)
+export type { TravelPlanStatus } from '@/types/travel';
 
 interface TravelPlanCardProps {
-  petName: string;
-  petImage?: string;
-  originCountry: string;
-  destinationCountry: string;
-  departureDate: string;
-  returnDate?: string;
-  status: TravelPlanStatus;
+  plan?: TravelPlan;
   className?: string;
   isLoading?: boolean;
+  error?: any;
+  onRetry?: () => void;
 }
 
 const TravelPlanCard: React.FC<TravelPlanCardProps> = ({
-  petName,
-  petImage,
-  originCountry,
-  destinationCountry,
-  departureDate,
-  returnDate,
-  status,
+  plan,
   className,
   isLoading = false,
+  error,
+  onRetry,
 }) => {
   // Default/fallback image for pets
-  const defaultImage = 'https://via.placeholder.com/100?text=Pet';
+  const defaultImage = '/pet.webp';
+  
+  // Handle error state
+  if (error) {
+    return (
+      <div className={`bg-card rounded-lg border border-destructive/30 shadow-sm overflow-hidden ${className}`}>
+        <div className="p-4 space-y-4 text-center">
+          <div className="mx-auto w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">Failed to load travel plan</h3>
+            <p className="text-sm text-muted-foreground mt-1">{handleApiError(error)}</p>
+          </div>
+          {onRetry && (
+            <button 
+              onClick={onRetry}
+              className="text-sm text-primary inline-flex items-center gap-1"
+            >
+              <RefreshCw className="h-3 w-3" /> Retry
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
   
   if (isLoading) {
     return (
@@ -64,15 +80,40 @@ const TravelPlanCard: React.FC<TravelPlanCardProps> = ({
     );
   }
 
+  // If no plan data is provided but not in loading/error state, show empty state
+  if (!plan && !isLoading) {
+    return (
+      <div className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden ${className}`}>
+        <div className="p-4 text-center">
+          <p className="text-muted-foreground">No travel plan data available</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Only proceed with rendering if we have plan data
+  if (!plan) return null;
+  
+  const { 
+    pet_name, 
+    pet_image, 
+    origin_country_name, 
+    destination_country_name, 
+    departure_date, 
+    return_date, 
+    status, 
+    id
+  } = plan;
+
   return (
     <div className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden hover:shadow-md transition-shadow ${className}`}>
       <div className="p-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="relative h-10 w-10 overflow-hidden rounded-full bg-muted">
-            {petImage ? (
+            {pet_image ? (
               <Image
-                src={petImage}
-                alt={petName}
+                src={pet_image}
+                alt={pet_name}
                 width={40}
                 height={40}
                 className="object-cover"
@@ -89,33 +130,33 @@ const TravelPlanCard: React.FC<TravelPlanCardProps> = ({
             )}
           </div>
           <div>
-            <h3 className="font-medium text-foreground">{petName}</h3>
+            <h3 className="font-medium text-foreground">{pet_name}</h3>
             <StatusBadge status={status} size="sm" />
           </div>
         </div>
 
         <div className="flex items-center justify-between mb-3 text-sm">
-          <div className="font-medium text-muted-foreground">{originCountry}</div>
+          <div className="font-medium text-muted-foreground">{origin_country_name}</div>
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <div className="font-medium text-muted-foreground">{destinationCountry}</div>
+          <div className="font-medium text-muted-foreground">{destination_country_name}</div>
         </div>
 
         <div className="flex items-center text-sm text-muted-foreground gap-1 mb-2">
           <Calendar className="h-4 w-4" />
-          <span>Departure: {formatDate(new Date(departureDate))}</span>
+          <span>Departure: {formatDate(new Date(departure_date))}</span>
         </div>
         
-        {returnDate && (
+        {return_date && (
           <div className="flex items-center text-sm text-muted-foreground gap-1">
             <Calendar className="h-4 w-4" />
-            <span>Return: {formatDate(new Date(returnDate))}</span>
+            <span>Return: {formatDate(new Date(return_date))}</span>
           </div>
         )}
       </div>
       
       <div className="px-4 py-3 bg-muted/50 border-t border-border">
         <Link 
-          href="/plans/details" 
+          href={`/plans/${id}`}
           className="text-sm font-medium text-primary hover:text-primary-600 transition-colors"
         >
           View details

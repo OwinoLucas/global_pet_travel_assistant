@@ -23,8 +23,10 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     
     # API endpoints
-    path("api/v1/", include("travel.urls")),
-    path("api/auth/", include("authentication.urls")),
+    path("api/", include([
+        path("", include("travel.urls")),
+        path("auth/", include("authentication.urls")),
+    ])),
     
     # API documentation
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),

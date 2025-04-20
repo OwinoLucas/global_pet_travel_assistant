@@ -50,13 +50,15 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick, className }) => {
           {/* Profile dropdown */}
           <div className="relative ml-3">
             <div className="flex rounded-full bg-secondary text-secondary-foreground">
-              <button
-                type="button"
-                className="flex rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-secondary"
-              >
-                <span className="sr-only">Open user menu</span>
-                <User className="h-6 w-6" aria-hidden="true" />
-              </button>
+              <Link href="/settings">
+                <button
+                  type="button"
+                  className="flex rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-secondary"
+                >
+                  <span className="sr-only">Open user menu</span>
+                  <User className="h-6 w-6" aria-hidden="true" />
+                </button>
+              </Link>
             </div>
           </div>
         </div>

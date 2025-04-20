@@ -71,3 +71,36 @@ export interface AuthError {
   };
 }
 
+// Request to refresh token
+export interface RefreshTokenRequest {
+  refresh: string;
+}
+
+// Response from token refresh
+export interface RefreshTokenResponse {
+  access: string;
+}
+
+// Change password request
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+// Update profile request
+export interface UpdateProfileRequest {
+  username?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+// Verify email request
+export interface VerifyEmailRequest {
+  token: string; // or verification_code depending on your backend
+}
+
+export interface MessageResponse {
+  message: string;
+}

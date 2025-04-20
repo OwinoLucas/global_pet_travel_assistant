@@ -1,216 +1,200 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAppDispatch } from '@/lib/redux/hooks';
-import { authFailed } from '@/lib/redux/slices/authSlice';
-import Button from '@/components/ui/Button';
-import { apiSlice } from '@/lib/api/apiSlice';
+import { Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 
-// Create API endpoints for email verification
-const emailVerificationApi = apiSlice.injectEndpoints({
-  endpoints: (builder) => ({
-    verifyEmail: builder.mutation<{ detail: string }, string>({
-      query: (token) => ({
-        url: `/api/auth/email/verify/${token}/`,
-        method: 'POST',
-      }),
-      transformErrorResponse: (response: any) => {
-        return {
-          status: response.status,
-          message: response.data?.detail || 'Email verification failed. Please try again.',
-        };
-      },
-    }),
-    resendVerificationEmail: builder.mutation<{ detail: string }, { email: string }>({
-      query: (data) => ({
-        url: '/api/auth/email/resend-verification/',
-        method: 'POST',
-        body: data,
-      }),
-      transformErrorResponse: (response: any) => {
-        return {
-          status: response.status,
-          message: response.data?.detail || 'Failed to resend verification email. Please try again.',
-        };
-      },
-    }),
-  }),
-});
-
-export const { 
-  useVerifyEmailMutation, 
-  useResendVerificationEmailMutation 
-} = emailVerificationApi;
-
-/**
- * Email Verification Page Component
- * 
- * Verifies a user's email using a token received by email
- */
-export default function VerifyEmailPage() {
+const VerifyEmailPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const dispatch = useAppDispatch();
   
-  // Get token and email from URL
-  const token = searchParams.get('token');
-  const email = searchParams.get('email');
+  const [verificationState, setVerificationState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [email, setEmail] = useState<string>('');
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccessful, setResendSuccessful] = useState(false);
   
-  // API hooks
-  const [verifyEmail, { isLoading: isVerifying }] = useVerifyEmailMutation();
-  const [resendVerificationEmail, { isLoading: isResending }] = useResendVerificationEmailMutation();
+  // Extract token from URL
+  const token = searchParams.get('token') || '';
+  const userEmail = searchParams.get('email') || '';
   
-  // UI states
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'success' | 'error'>('pending');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [redirectCountdown, setRedirectCountdown] = useState(5);
-  const [resendCooldown, setResendCooldown] = useState(0);
-
-  // Verify token when component mounts
+  // Verify token when component loads
   useEffect(() => {
-    const verifyToken = async () => {
-      if (!token) {
-        setVerificationStatus('error');
-        setErrorMessage('No verification token provided. Please check your email link or request a new verification email.');
-        return;
-      }
-
-      try {
-        const result = await verifyEmail(token).unwrap();
-        setVerificationStatus('success');
-        setSuccessMessage(result.detail || 'Email verified successfully! You can now login to your account.');
-      } catch (error: any) {
-        console.error('Email verification failed:', error);
-        setVerificationStatus('error');
-        setErrorMessage(error.message || 'Email verification failed. The link may be invalid or expired.');
-        dispatch(authFailed(error.message || 'Email verification failed'));
-      }
-    };
-
-    if (token) {
-      verifyToken();
-    }
-  }, [token, verifyEmail, dispatch]);
-
-  // Countdown effect for redirect after successful verification
-  useEffect(() => {
-    if (verificationStatus === 'success' && redirectCountdown > 0) {
-      const timer = setTimeout(() => {
-        setRedirectCountdown(redirectCountdown - 1);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    } else if (verificationStatus === 'success' && redirectCountdown === 0) {
-      router.push('/login');
-    }
-  }, [verificationStatus, redirectCountdown, router]);
-
-  // Cooldown timer for resend button
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => {
-        setResendCooldown(resendCooldown - 1);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
-
-  /**
-   * Handle resend verification email
-   */
-  const handleResendVerification = async () => {
-    if (!email) {
-      setErrorMessage('Email address is required to resend verification.');
+    if (!token) {
+      setVerificationState('error');
+      setErrorMessage('No verification token provided. Please check your email for the correct link or request a new verification email.');
       return;
     }
-
+    
+    // Set email for resend verification
+    if (userEmail) {
+      setEmail(userEmail);
+    }
+    
+    // In a real app, you would verify the token with an API call
+    // For demo, we'll simulate this with a timeout
+    const verifyToken = async () => {
+      try {
+        // Simulating API call to verify token
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // For demo purposes, all tokens are valid except this test case
+        if (token === 'invalid-token') {
+          setVerificationState('error');
+          setErrorMessage('Invalid or expired verification token. Please request a new verification email.');
+          return;
+        }
+        
+        // Verification successful
+        setVerificationState('success');
+        
+        // In a real app, you would redirect to login after a delay
+        setTimeout(() => {
+          router.push('/login');
+        }, 5000);
+      } catch (error) {
+        setVerificationState('error');
+        setErrorMessage('Failed to verify your email. Please try again or request a new verification email.');
+      }
+    };
+    
+    verifyToken();
+  }, [token, userEmail, router]);
+  
+  // Handle resend verification email
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    setResendSuccessful(false);
+    
     try {
-      const result = await resendVerificationEmail({ email }).unwrap();
-      setSuccessMessage(result.detail || 'Verification email has been resent. Please check your inbox.');
-      setResendCooldown(60); // Set cooldown to 60 seconds
-    } catch (error: any) {
+      // In a real app, this would be an API call to resend the verification email
+      // For demo purposes, we're simulating the API call with a timeout
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Simulate success
+      setResendSuccessful(true);
+    } catch (error) {
+      // Handle error
       console.error('Failed to resend verification email:', error);
-      setErrorMessage(error.message || 'Failed to resend verification email. Please try again later.');
+    } finally {
+      setIsResending(false);
     }
   };
-
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h1 className="text-3xl font-extrabold text-gray-900">Email Verification</h1>
-          {verificationStatus === 'pending' && (
-            <p className="mt-2 text-gray-600">
-              Verifying your email address...
-            </p>
-          )}
-          {verificationStatus === 'success' && (
-            <p className="mt-2 text-gray-600">
-              Your email has been verified successfully.
-            </p>
-          )}
-          {verificationStatus === 'error' && (
-            <p className="mt-2 text-gray-600">
-              There was a problem verifying your email.
-            </p>
-          )}
+  
+  // Loading state
+  if (verificationState === 'loading') {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Verifying Your Email</h1>
+          <p className="text-sm text-muted-foreground">
+            Please wait while we verify your email address
+          </p>
         </div>
-
-        {errorMessage && (
-          <div className="p-4 mt-4 text-sm text-red-800 bg-red-100 rounded-md">
-            {errorMessage}
+        
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Verifying...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // Success state
+  if (verificationState === 'success') {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Email Verified</h1>
+        </div>
+        
+        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800 border border-green-200">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            </div>
+            <div className="ml-3">
+              <p className="font-medium">Your email has been successfully verified!</p>
+              <p className="mt-1">
+                You can now log in to your account. You will be redirected to the login page shortly.
+              </p>
+            </div>
           </div>
-        )}
-
-        {successMessage && (
-          <div className="p-4 mt-4 text-sm text-green-800 bg-green-100 rounded-md">
-            {successMessage}
-            {verificationStatus === 'success' && (
-              <div className="mt-2">
-                Redirecting to login page in {redirectCountdown} seconds...
-              </div>
-            )}
-          </div>
-        )}
-
-        {verificationStatus === 'pending' && isVerifying && (
-          <div className="flex justify-center">
-            <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin"></div>
-          </div>
-        )}
-
-        {verificationStatus === 'error' && email && (
-          <div className="mt-6">
-            <p className="mb-4 text-center text-gray-700">
-              If you need a new verification email, click the button below:
-            </p>
-            <Button
-              type="button"
-              variant="primary"
-              size="lg"
-              isLoading={isResending}
-              className="w-full"
-              onClick={handleResendVerification}
-              disabled={resendCooldown > 0}
-            >
-              {resendCooldown > 0 
-                ? `Resend Email (${resendCooldown}s)` 
-                : 'Resend Verification Email'}
-            </Button>
-          </div>
-        )}
-
-        <div className="mt-6 text-center">
-          <Link href="/login" className="text-sm font-medium text-blue-600 hover:text-blue-500">
-            Back to sign in
+        </div>
+        
+        <div className="text-center">
+          <Link
+            href="/login"
+            className="font-medium text-primary hover:text-primary-600 hover:underline"
+          >
+            Go to login
           </Link>
         </div>
       </div>
+    );
+  }
+  
+  // Error state
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">Email Verification Failed</h1>
+      </div>
+      
+      <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div className="ml-3">
+            <h3 className="font-medium">Error</h3>
+            <p>{errorMessage || 'Something went wrong with your email verification'}</p>
+          </div>
+        </div>
+      </div>
+      
+      {email && (
+        <div className="bg-card border border-border rounded-md p-4">
+          <h3 className="text-sm font-medium mb-2">Resend Verification Email</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            If you didn't receive the verification email or if the link has expired, you can request a new one.
+          </p>
+          
+          {resendSuccessful ? (
+            <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 border border-green-200 mb-4">
+              <p>Verification email has been resent. Please check your inbox.</p>
+            </div>
+          ) : (
+            <button
+              onClick={handleResendVerification}
+              disabled={isResending}
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isResending ? (
+                <div className="flex items-center justify-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </div>
+              ) : (
+                'Resend Verification Email'
+              )}
+            </button>
+          )}
+        </div>
+      )}
+      
+      <div className="text-center">
+        <Link
+          href="/login"
+          className="font-medium text-primary hover:text-primary-600 hover:underline"
+        >
+          Back to login
+        </Link>
+      </div>
     </div>
   );
-}
+};
+
+export default VerifyEmailPage;
 
