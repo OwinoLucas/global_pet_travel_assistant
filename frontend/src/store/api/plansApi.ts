@@ -28,62 +28,62 @@ export const plansApi = api.injectEndpoints({
         }
         
         const queryString = queryParams.toString();
-        return `api/v1/travel/plans/${queryString ? `?${queryString}` : ''}`;
+        return `travel/plans/${queryString ? `?${queryString}` : ''}`;
       },
       providesTags: (result) =>
         result
           ? [
               ...result.map(({ id }) => ({ type: 'TravelPlans' as const, id })),
-              { type: 'TravelPlans', id: 'LIST' }
+              { type: 'TravelPlans' as const, id: 'LIST' }
             ]
-          : [{ type: 'TravelPlans', id: 'LIST' }],
+          : [{ type: 'TravelPlans' as const, id: 'LIST' }]
     }),
     
     // Get a single travel plan by ID
     getPlanById: builder.query<TravelPlan, number>({
-      query: (id) => `api/v1/travel/plans/${id}/`,
-      providesTags: (result, error, id) => [{ type: 'TravelPlans', id }],
+      query: (id) => `travel/plans/${id}/`,
+      providesTags: (result, error, id) => [{ type: 'TravelPlans' as const, id }]
     }),
     
     // Create a new travel plan
     createPlan: builder.mutation<TravelPlan, CreateTravelPlanRequest>({
       query: (plan) => ({
-        url: 'api/v1/travel/plans/',
+        url: 'travel/plans/',
         method: 'POST',
         body: plan,
       }),
-      invalidatesTags: [{ type: 'TravelPlans', id: 'LIST' }],
+      invalidatesTags: [{ type: 'TravelPlans' as const, id: 'LIST' }]
     }),
     
     // Update an existing travel plan
     updatePlan: builder.mutation<TravelPlan, { id: number; plan: UpdateTravelPlanRequest }>({
       query: ({ id, plan }) => ({
-        url: `api/v1/travel/plans/${id}/`,
+        url: `travel/plans/${id}/`,
         method: 'PATCH',
         body: plan,
       }),
       invalidatesTags: (result, error, { id }) => [
-        { type: 'TravelPlans', id },
-        { type: 'TravelPlans', id: 'LIST' },
-      ],
+        { type: 'TravelPlans' as const, id },
+        { type: 'TravelPlans' as const, id: 'LIST' }
+      ]
     }),
     
     // Delete a travel plan
     deletePlan: builder.mutation<void, number>({
       query: (id) => ({
-        url: `api/v1/travel/plans/${id}/`,
+        url: `travel/plans/${id}/`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'TravelPlans', id: 'LIST' }],
+      invalidatesTags: [{ type: 'TravelPlans' as const, id: 'LIST' }]
     }),
     
     // Get all requirements for a travel plan
     getPlanRequirements: builder.query<TravelPlan, number>({
-      query: (id) => `api/v1/travel/plans/${id}/requirements/`,
+      query: (id) => `travel/plans/${id}/requirements/`,
       providesTags: (result, error, id) => [
-        { type: 'TravelPlans', id },
-        { type: 'Requirements', id: `plan-${id}` },
-      ],
+        { type: 'TravelPlans' as const, id },
+        { type: 'Requirements' as const, id: `plan-${id}` }
+      ]
     }),
     
     // Update a requirement status for a travel plan
@@ -98,7 +98,7 @@ export const plansApi = api.injectEndpoints({
       }
     >({
       query: ({ planId, requirementId, status, notes, completionDate }) => ({
-        url: `api/v1/travel/plans/${planId}/update_requirement/`,
+        url: `travel/plans/${planId}/update_requirement/`,
         method: 'POST',
         body: { 
           requirement_id: requirementId, 
@@ -108,9 +108,9 @@ export const plansApi = api.injectEndpoints({
         },
       }),
       invalidatesTags: (result, error, { planId }) => [
-        { type: 'Requirements', id: `plan-${planId}` },
-        { type: 'TravelPlans', id: planId },
-      ],
+        { type: 'Requirements' as const, id: `plan-${planId}` },
+        { type: 'TravelPlans' as const, id: planId }
+      ]
     }),
     
     // Upload a proof document for a requirement
@@ -129,7 +129,7 @@ export const plansApi = api.injectEndpoints({
         formData.append('proof_document', proofDocument);
         
         return {
-          url: `api/v1/travel/plans/${planId}/upload_proof/`,
+          url: `travel/plans/${planId}/upload_proof/`,
           method: 'POST',
           body: formData,
           // Don't set Content-Type header, browser will set it with boundary
@@ -137,11 +137,11 @@ export const plansApi = api.injectEndpoints({
         };
       },
       invalidatesTags: (result, error, { planId }) => [
-        { type: 'Requirements', id: `plan-${planId}` },
-        { type: 'TravelPlans', id: planId },
-      ],
-    }),
-  }),
+        { type: 'Requirements' as const, id: `plan-${planId}` },
+        { type: 'TravelPlans' as const, id: planId }
+      ]
+    })
+  })
 });
 
 // Export hooks for usage in functional components

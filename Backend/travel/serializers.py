@@ -76,15 +76,43 @@ class UserQueryCreateSerializer(serializers.ModelSerializer):
 
 
 class PetSerializer(serializers.ModelSerializer):
-    type_name = serializers.CharField(source='type.name', read_only=True)
+    type = PetTypeSerializer(read_only=True)
+    type_id = serializers.PrimaryKeyRelatedField(
+        source='type', write_only=True, queryset=PetType.objects.all()
+    )
+    owner_info = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = Pet
         fields = [
-            'id', 'name', 'type', 'type_name', 'breed', 'age', 
-            'weight', 'microchip_id', 'image', 'created_at', 'updated_at'
+            'id', 'name', 'type', 'type_id', 'owner', 'owner_info', 'breed', 
+            'age', 'weight', 'microchip_id', 'image', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'owner']
+    
+    def get_owner_info(self, obj):
+        """Return basic owner information."""
+        if obj.owner:
+            return {
+                'id': obj.owner.id,
+                'username': obj.owner.username,
+                'email': obj.owner.email,
+                'first_name': obj.owner.first_name,
+                'last_name': obj.owner.last_name,
+            }
+        return None
+        
+    def validate_age(self, value):
+        """Validate that age is positive if provided."""
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Age must be a positive number.")
+        return value
+        
+    def validate_weight(self, value):
+        """Validate that weight is positive if provided."""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Weight must be greater than zero.")
+        return value
     
     def create(self, validated_data):
         # Assign the current user as the owner
@@ -114,22 +142,81 @@ class TravelRequirementSerializer(serializers.ModelSerializer):
 
 
 class TravelPlanSerializer(serializers.ModelSerializer):
-    pet_name = serializers.CharField(source='pet.name', read_only=True)
-    pet_image = serializers.ImageField(source='pet.image', read_only=True)
-    origin_country_name = serializers.CharField(source='origin_country.name', read_only=True)
-    destination_country_name = serializers.CharField(source='destination_country.name', read_only=True)
-    days_until_departure = serializers.IntegerField(read_only=True)
+    # Read-only nested serializers
+    pet_detail = PetSerializer(source='pet', read_only=True)
+    origin_country_detail = CountrySerializer(source='origin_country', read_only=True)
+    destination_country_detail = CountrySerializer(source='destination_country', read_only=True)
+    
+    # Write-only fields for related objects
+    pet_id = serializers.PrimaryKeyRelatedField(
+        source='pet', write_only=True, queryset=Pet.objects.all()
+    )
+    origin_country_id = serializers.PrimaryKeyRelatedField(
+        source='origin_country', write_only=True, queryset=Country.objects.all()
+    )
+    destination_country_id = serializers.PrimaryKeyRelatedField(
+        source='destination_country', write_only=True, queryset=Country.objects.all()
+    )
+    
+    # Computed fields
+    days_until_departure = serializers.SerializerMethodField()
+    requirements_status = serializers.SerializerMethodField()
     
     class Meta:
         model = TravelPlan
         fields = [
-            'id', 'name', 'pet', 'pet_name', 'pet_image', 
-            'origin_country', 'origin_country_name', 
-            'destination_country', 'destination_country_name',
+            'id', 'name', 
+            # Related objects with both read and write fields
+            'pet', 'pet_id', 'pet_detail',
+            'origin_country', 'origin_country_id', 'origin_country_detail',
+            'destination_country', 'destination_country_id', 'destination_country_detail',
+            # Basic fields
             'departure_date', 'return_date', 'status', 'notes',
-            'days_until_departure', 'created_at', 'updated_at'
+            # Computed fields
+            'days_until_departure', 'requirements_status',
+            # Metadata
+            'created_at', 'updated_at', 'owner'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'owner', 'days_until_departure']
+        read_only_fields = ['created_at', 'updated_at', 'owner']
+    
+    def get_days_until_departure(self, obj):
+        """Calculate and return days until departure."""
+        return obj.days_until_departure()
+    
+    def get_requirements_status(self, obj):
+        """Get summary of requirements completion status."""
+        # Get all requirements for this travel plan
+        travel_reqs = TravelRequirement.objects.filter(travel_plan=obj)
+        
+        # Count requirements by status
+        total = travel_reqs.count()
+        completed = travel_reqs.filter(status='completed').count()
+        in_progress = travel_reqs.filter(status='in_progress').count()
+        not_started = travel_reqs.filter(status='not_started').count()
+        not_applicable = travel_reqs.filter(status='not_applicable').count()
+        
+        # If no requirements exist yet, check if we should create them
+        if total == 0:
+            # Get requirements for destination and pet type
+            country_reqs = CountryPetRequirement.objects.filter(
+                country=obj.destination_country,
+                pet_type=obj.pet.type
+            )
+            total = country_reqs.count()
+            
+        # Calculate completion percentage
+        completion_percentage = 0
+        if total > 0:
+            completion_percentage = (completed / total) * 100
+            
+        return {
+            'total': total,
+            'completed': completed,
+            'in_progress': in_progress,
+            'not_started': not_started,
+            'not_applicable': not_applicable,
+            'completion_percentage': round(completion_percentage, 1)
+        }
     
     def validate(self, data):
         # Validate departure_date is in the future

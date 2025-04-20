@@ -20,24 +20,24 @@ export const travelApi = api.injectEndpoints({
   endpoints: (builder) => ({
     // Country endpoints
     getCountries: builder.query<Country[], void>({
-      query: () => '/countries/',
-      providesTags: ['Countries']
+      query: () => 'travel/countries/',
+      providesTags: [{ type: 'Countries' as const, id: 'LIST' }]
     }),
     
     getCountry: builder.query<Country, number>({
-      query: (id) => `/countries/${id}/`,
-      providesTags: (result, error, id) => [{ type: 'Countries', id }]
+      query: (id) => `travel/countries/${id}/`,
+      providesTags: (result, error, id) => [{ type: 'Countries' as const, id }]
     }),
     
     // Pet Type endpoints
     getPetTypes: builder.query<PetType[], void>({
-      query: () => '/pet-types/',
-      providesTags: ['PetTypes']
+      query: () => 'travel/pet-types/',
+      providesTags: [{ type: 'PetTypes' as const, id: 'LIST' }]
     }),
     
     getPetType: builder.query<PetType, number>({
-      query: (id) => `/pet-types/${id}/`,
-      providesTags: (result, error, id) => [{ type: 'PetTypes', id }]
+      query: (id) => `travel/pet-types/${id}/`,
+      providesTags: (result, error, id) => [{ type: 'PetTypes' as const, id }]
     }),
     
     // Requirements endpoints
@@ -59,43 +59,49 @@ export const travelApi = api.injectEndpoints({
         }
         
         const queryString = queryParams.toString();
-        return `/requirements/${queryString ? `?${queryString}` : ''}`;
+        return `travel/requirements/${queryString ? `?${queryString}` : ''}`;
       },
-      providesTags: ['Requirements']
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: 'Requirements' as const, id })),
+              { type: 'Requirements' as const, id: 'LIST' }
+            ]
+          : [{ type: 'Requirements' as const, id: 'LIST' }]
     }),
     
     getRequirement: builder.query<DetailedRequirement, number>({
-      query: (id) => `/requirements/${id}/`,
-      providesTags: (result, error, id) => [{ type: 'Requirements', id }]
+      query: (id) => `travel/requirements/${id}/`,
+      providesTags: (result, error, id) => [{ type: 'Requirements' as const, id }]
     }),
     
     // User Query endpoints
     getUserQueries: builder.query<UserQuery[], void>({
-      query: () => '/queries/',
-      providesTags: ['Queries']
+      query: () => 'travel/queries/',
+      providesTags: [{ type: 'Queries' as const, id: 'LIST' }]
     }),
     
     getUserQuery: builder.query<DetailedUserQuery, number>({
-      query: (id) => `/queries/${id}/`,
-      providesTags: (result, error, id) => [{ type: 'Queries', id }]
+      query: (id) => `travel/queries/${id}/`,
+      providesTags: (result, error, id) => [{ type: 'Queries' as const, id }]
     }),
     
     createUserQuery: builder.mutation<UserQuery, CreateUserQueryRequest>({
       query: (query) => ({
-        url: '/queries/',
+        url: 'travel/queries/',
         method: 'POST',
         body: query
       }),
-      invalidatesTags: ['Queries']
+      invalidatesTags: [{ type: 'Queries' as const, id: 'LIST' }]
     }),
     
     provideQueryFeedback: builder.mutation<UserQuery, { id: number, feedback: QueryFeedbackRequest }>({
       query: ({ id, feedback }) => ({
-        url: `/queries/${id}/`,
+        url: `travel/queries/${id}/`,
         method: 'PATCH',
         body: feedback
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Queries', id }]
+      invalidatesTags: (result, error, { id }) => [{ type: 'Queries' as const, id }]
     })
   })
 });

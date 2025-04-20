@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useDispatch, useSelector } from 'react-redux';
-import { setCredentials } from '@/store/features/authSlice';
+import { setAuth } from '@/store/features/auth/authSlice';
 import { useLoginMutation } from '@/store/api/authApi';
 import { LoginRequest, AuthResponse } from '@/types/auth';
 import { RootState } from '@/store';
@@ -35,6 +35,9 @@ export default function LoginPage() {
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  const searchParams = useSearchParams();
   
   const router = useRouter();
   const dispatch = useDispatch();
@@ -60,6 +63,31 @@ export default function LoginPage() {
       setLoginError(null);
     }
   }, [loginApiError]);
+  
+  // Check for registration success and pre-fill email
+  useEffect(() => {
+    const registered = searchParams.get('registered') === 'true';
+    const registeredEmail = sessionStorage.getItem('registerEmail');
+    
+    if (registered && registeredEmail) {
+      setSuccessMessage('Account created successfully! Please log in with your credentials.');
+      
+      // Pre-fill email field
+      setFormData(prev => ({
+        ...prev,
+        email: registeredEmail,
+        password: '' // Ensure password field is empty
+      }));
+      
+      // Clean up stored email
+      sessionStorage.removeItem('registerEmail');
+    }
+    
+    // Clear success message on cleanup
+    return () => {
+      setSuccessMessage(null);
+    };
+  }, [searchParams]);
   
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,12 +153,15 @@ export default function LoginPage() {
       
       // Update auth state in Redux with the response data
       dispatch(
-        setCredentials({
-          token: result.tokens.access,
-          refresh: result.tokens.refresh,
+        setAuth({
           user: result.user,
+          tokens: {
+            access: result.tokens.access,
+            refresh: result.tokens.refresh,
+          },
         })
       );
+      
       
       // Redirect to dashboard will happen automatically via useEffect when isAuthenticated changes
       
@@ -168,6 +199,13 @@ export default function LoginPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-border">
+          {/* Success message */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md" role="alert">
+              <p>{successMessage}</p>
+            </div>
+          )}
+          
           {/* General error message */}
           {loginError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">

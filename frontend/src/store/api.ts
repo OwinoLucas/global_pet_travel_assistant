@@ -39,7 +39,7 @@ const prepareHeaders = (headers: Headers, { getState }: { getState: () => unknow
 
 // Base query with error handling
 const baseQuery = fetchBaseQuery({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/',
+  baseUrl: (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/',
   prepareHeaders,
   credentials: 'include', // Include credentials for cookie-based auth if needed
 });
@@ -64,7 +64,7 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
           // Attempt to refresh the token
           const refreshResult = await baseQuery(
             { 
-              url: 'api/auth/token/refresh/', 
+              url: 'auth/token/refresh/', 
               method: 'POST', 
               body: { refresh: refreshToken } 
             }, 
@@ -120,11 +120,12 @@ export const api = createApi({
     'Countries', 
     'PetTypes', 
     'Requirements', 
-    'Queries'
+    'Queries',
+    'TravelPlans'
   ],
   endpoints: (builder) => ({
     getPets: builder.query<any[], void>({
-      query: () => 'api/pets/',
+      query: () => 'pets/',
       providesTags: ['Profile'],
     }),
   }),

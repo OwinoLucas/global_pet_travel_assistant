@@ -118,10 +118,24 @@ class UserQueryViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of an object to edit it.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to any request
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Write permissions are only allowed to the owner
+        return obj.owner == request.user
+
+
 class PetViewSet(viewsets.ModelViewSet):
     """ViewSet for managing pets."""
     serializer_class = PetSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'breed']
     filterset_fields = ['type']
@@ -129,11 +143,15 @@ class PetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter queryset to only return the authenticated user's pets."""
         return Pet.objects.filter(owner=self.request.user).order_by('name')
+        
+    def perform_create(self, serializer):
+        """Assign the current user as the owner of the pet."""
+        serializer.save(owner=self.request.user)
 
 
 class TravelPlanViewSet(viewsets.ModelViewSet):
     """ViewSet for managing travel plans."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'pet', 'origin_country', 'destination_country']
     search_fields = ['name', 'notes']

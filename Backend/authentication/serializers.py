@@ -28,28 +28,34 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class LoginSerializer(TokenObtainPairSerializer):
-    username_field = 'email'  # Change the username field to email
-    
+    username_field = 'email'  # Use email instead of username
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['email'] = serializers.EmailField()
-        self.fields.pop('username', None)  # Remove the username field
-    
+        self.fields.pop('username', None)
+
     def validate(self, attrs):
-        # Convert email to username for the parent class
-        attrs['username'] = attrs.pop('email')
         data = super().validate(attrs)
-        data["user"] = {
-            "id": self.user.id,
-            "username": self.user.username,
-            "email": self.user.email,
-            "first_name": self.user.first_name,
-            "last_name": self.user.last_name,
-            "is_active": self.user.is_active,
-            "date_joined": self.user.date_joined,
-            "last_login": self.user.last_login,
+        return {
+            "tokens": {
+                "access": data["access"],
+                "refresh": data["refresh"],
+            },
+            "user": {
+                "id": self.user.id,
+                "username": self.user.username,
+                "email": self.user.email,
+                "first_name": self.user.first_name,
+                "last_name": self.user.last_name,
+                "is_active": self.user.is_active,
+                "date_joined": self.user.date_joined,
+                "last_login": self.user.last_login,
+            }
         }
+
         return data
+
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)

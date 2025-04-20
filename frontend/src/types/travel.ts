@@ -42,30 +42,12 @@ export type TravelPlanStatus = 'planning' | 'ready' | 'in_progress' | 'completed
 /**
  * Travel plan interface for trips with pets
  */
-export interface TravelPlans {
-  id: number;
-  name: string;
-  pet: number;
-  pet_name: string;
-  pet_image?: string;
-  origin_country: number;
-  origin_country_name: string;
-  destination_country: number;
-  destination_country_name: string;
-  departure_date: string;
-  return_date?: string;
-  status: TravelPlanStatus;
-  notes?: string;
-  days_until_departure?: number;
-  created_at: string;
-  updated_at: string;
-  requirements?: TravelRequirement[];
-}
+// TravelPlans interface has been consolidated with TravelPlan interface (see line ~270)
 
 /**
  * Detailed travel plan with nested objects
  */
-export interface DetailedTravelPlan extends Omit<TravelPlans, 'pet' | 'origin_country' | 'destination_country'> {
+export interface DetailedTravelPlan extends Omit<TravelPlan, 'pet' | 'origin_country' | 'destination_country'> {
   pet: Pet;
   origin_country: Country;
   destination_country: Country;
@@ -235,20 +217,7 @@ export interface QueryFeedbackRequest {
 
 
 
-// Travel requirements
-export interface PetTravelRequirement {
-  id: number;
-  origin_country: number;
-  destination_country: number;
-  pet_type: string;
-  requirement_type: 'vaccination' | 'certificate' | 'quarantine' | 'parasite' | 'microchip' | 'other';
-  description: string;
-  is_mandatory: boolean;
-  valid_from?: string;
-  valid_until?: string;
-  documentation_url?: string;
-  notes?: string;
-}
+// Travel requirements - moved to line 75
 
 
 
@@ -269,18 +238,28 @@ export interface TravelDocument {
 }
 
 // Travel plan
+/**
+ * Travel plan interface for trips with pets - consolidated from previous TravelPlans interface
+ */
 export interface TravelPlan {
   id: number;
+  name: string;
   pet: number;
+  pet_name: string;
+  pet_image?: string;
   origin_country: number;
+  origin_country_name: string;
   destination_country: number;
+  destination_country_name: string;
   departure_date: string;
   return_date?: string;
   carrier?: string;
+  status: TravelPlanStatus;
   notes?: string;
-  status: 'planning' | 'ready' | 'in_progress' | 'completed' | 'cancelled';
+  days_until_departure?: number;
   created_at: string;
   updated_at: string;
+  requirements?: TravelRequirement[];
 }
 
 // User preferences

@@ -126,15 +126,11 @@ const RegisterPage: React.FC = () => {
       // Attempt registration
       const response = await registerUser(registerData).unwrap();
       
-      // Store auth data in Redux
-      dispatch(setCredentials({
-        user: response.user,
-        token: response.tokens.access,
-        refresh: response.tokens.refresh,
-      }));
+      // Store email in sessionStorage for login page
+      sessionStorage.setItem('registerEmail', data.email);
       
-      // Redirect to dashboard
-      router.push('/');
+      // Redirect to login page with success parameter
+      router.push('/login?registered=true');
     } catch (error: any) {
       // Handle error responses from API
       if (error?.data?.detail) {

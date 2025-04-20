@@ -5,7 +5,7 @@ import { Check, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import type { Status } from '@/components/ui/StatusBadge';
 import { useGetRequirementsQuery, useGetPetTypesQuery } from '@/store/api/travelApi';
-import { Requirement as ApiRequirement } from '@/types/travel';
+import { Requirement } from '@/types/travel';
 import { handleApiError } from '@/store/api';
 
 // Requirement specific statuses
@@ -13,12 +13,20 @@ export type RequirementStatus = Extract<
   Status,
   'completed' | 'pending' | 'upcoming' | 'overdue'
 >;
-
-// Frontend requirement model
-interface RequirementItemProps {
-  requirement: ApiRequirement;
+// Frontend requirement model with formatted data
+interface FormattedRequirement {
+  id: number;
+  petName: string;
+  description: string;
+  details: string;
+  validity_period: number;
+  is_mandatory: boolean;
+  status: RequirementStatus;
 }
 
+interface RequirementItemProps {
+  requirement: FormattedRequirement;
+}
 const RequirementItem: React.FC<RequirementItemProps> = ({ requirement }) => {
   // Function to get the appropriate status icon
   const getStatusIcon = () => {
@@ -70,13 +78,13 @@ const RequirementItem: React.FC<RequirementItemProps> = ({ requirement }) => {
           <div className="text-sm text-muted-foreground">
             <span>For {requirement.petName}</span>
             <span className="mx-2">•</span>
-            <span>Due {formatDueDate(requirement.validity_period)}</span>
+            <span>Due {formatDueDate(new Date(Date.now() + requirement.validity_period * 24 * 60 * 60 * 1000).toISOString())}</span>
           </div>
         </div>
       </div>
       <div>
         <StatusBadge 
-          status={requirement.details} 
+          status={requirement.status} 
           className="whitespace-nowrap"
         />
       </div>
@@ -88,43 +96,61 @@ const RequirementItem: React.FC<RequirementItemProps> = ({ requirement }) => {
 
 
 // Fallback mock data when API is not available
-const mockRequirements: ApiRequirement[] = [
+const mockRequirements: Requirement[] = [
   {
     id: 1,
-    petName: 'Buddy',
+    country: 1,
+    pet_type: 1,
     description: 'Rabies vaccination',
-    dueDate: '2025-04-25',
-    status: 'pending',
+    details: 'Must be administered at least 21 days before travel',
+    documentation_needed: ['Vaccination certificate'],
+    validity_period: 30, // days
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_mandatory: true
   },
   {
     id: 2,
-    petName: 'Luna',
+    country: 1,
+    pet_type: 2,
     description: 'EU Pet Passport application',
-    dueDate: '2025-05-10',
-    status: 'upcoming',
+    details: 'Required for travel within the EU',
+    documentation_needed: ['Application form', 'Pet photos'],
+    validity_period: 60, // days
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_mandatory: true
   },
   {
     id: 3,
-    petName: 'Max',
+    country: 2,
+    pet_type: 1,
     description: 'Microchip verification',
-    dueDate: '2025-04-22',
-    status: 'completed',
+    details: 'ISO standard microchip required',
+    documentation_needed: ['Microchip certificate'],
+    validity_period: 10, // days
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_mandatory: true
   },
   {
     id: 4,
-    petName: 'Daisy',
+    country: 3,
+    pet_type: 1,
     description: 'Tapeworm treatment',
-    dueDate: '2025-04-18',
-    status: 'overdue',
+    details: 'Must be administered 1-5 days before travel',
+    documentation_needed: ['Veterinary certificate'],
+    validity_period: 5, // days
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_mandatory: true
   },
 ];
 
-interface RequirementItemProps {
-  requirement: ApiRequirement;
-}
+// Removed duplicate interface
 
 // Helper function to determine requirement status based on validity period
-const getRequirementStatus = (requirement: ApiRequirement): RequirementStatus => {
+const getRequirementStatus = (requirement: Requirement): RequirementStatus => {
   const today = new Date();
   const dueDate = new Date(today.getTime() + requirement.validity_period * 24 * 60 * 60 * 1000);
   
@@ -182,21 +208,39 @@ const RequirementsError: React.FC<{ error: any }> = ({ error }) => (
 const RequirementsList: React.FC = () => {
   // Get selected country/pet type from state or props
   // For demo, we'll fetch all requirements
-  const { data: requirements, isLoading, error } = useGetRequirementsQuery();
-  const { data: petTypes } = useGetPetTypesQuery();
+  const { 
+    data: requirements = [], // Provide default empty array
+    isLoading, 
+    error 
+  } = useGetRequirementsQuery();
+  
+  const { 
+    data: petTypes = [] // Provide default empty array
+  } = useGetPetTypesQuery();
   
   // Convert API data to component format
   const formattedRequirements = useMemo(() => {
-    if (!requirements) return null;
-    
-    return requirements.map(req => ({
+    const formatRequirement = (req: Requirement): FormattedRequirement => ({
       id: req.id,
-      petName: petTypes?.find(pt => pt.id === req.pet_type)?.name || 'Pet',
+      petName: petTypes.find(pt => pt.id === req.pet_type)?.name || 'Pet',
       description: req.description,
       details: req.details,
-      dueDate: new Date(Date.now() + req.validity_period * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      validity_period: req.validity_period,
+      is_mandatory: req.is_mandatory,
       status: getRequirementStatus(req)
-    }));
+    });
+
+    // If we have requirements data, use it
+    if (requirements.length > 0) {
+      return requirements.map(formatRequirement);
+    }
+    
+    // If in development and no requirements, use mock data
+    if (process.env.NODE_ENV === 'development') {
+      return mockRequirements.map(formatRequirement);
+    }
+    
+    return [];
   }, [requirements, petTypes]);
   
   // Loading state
@@ -209,20 +253,15 @@ const RequirementsList: React.FC = () => {
     return <RequirementsError error={error} />;
   }
   
-  // Use mock data in development if no real data
-  const displayRequirements = formattedRequirements || 
-    (process.env.NODE_ENV === 'development' ? mockRequirements : []);
-  
   return (
     <div className="space-y-1">
-      {displayRequirements.length === 0 ? (
+      {formattedRequirements.map((requirement) => (
+        <RequirementItem key={requirement.id} requirement={requirement} />
+      ))}
+      {formattedRequirements.length === 0 && (
         <div className="text-center py-4 text-muted-foreground">
           No upcoming requirements found.
         </div>
-      ) : (
-        displayRequirements.map((requirement) => (
-          <RequirementItem key={requirement.id} requirement={requirement} />
-        ))
       )}
     </div>
   );
