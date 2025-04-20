@@ -24,12 +24,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7j!2g*nl+-7cgbuakc5xzm&uexsvfo0(r=%68tzt%7o67_1e=4'
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1', '*']
 
 
 # Application definition
@@ -46,6 +47,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_yasg',
+    'django_ratelimit',
+    'django_redis',
     
     # Local apps
     'travel',
@@ -86,7 +89,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.mysql'),
+        'ENGINE': os.environ.get('DB_ENGINE'),
         'NAME': os.environ.get('DB_NAME'),
         'USER': os.environ.get('DB_USER'),
         'PASSWORD': os.environ.get('DB_PASSWORD'),
@@ -94,24 +97,6 @@ DATABASES = {
         'PORT': os.environ.get('DB_PORT'),
     }
 }
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
 
 
 # Internationalization
@@ -142,10 +127,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
@@ -168,4 +152,62 @@ SWAGGER_SETTINGS = {
     },
     'USE_SESSION_AUTH': True,
     'VALIDATOR_URL': None,
+}
+
+# Authentication settings
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+# JWT Settings
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME', 60))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME', 10080))),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+}
+
+# Add authentication app to INSTALLED_APPS
+INSTALLED_APPS += ['authentication']
+
+
+
+# Frontend URL for password reset
+FRONTEND_URL = os.environ.get('FRONTEND_URL')
+
+# Rate limiting settings
+RATELIMIT_ENABLE = os.environ.get('RATELIMIT_ENABLE', 'True').lower() == 'true'
+RATELIMIT_USE_CACHE = os.environ.get('RATELIMIT_USE_CACHE', 'default')
+RATELIMIT_CACHE_PREFIX = os.environ.get('RATELIMIT_CACHE_PREFIX', 'rl:')
+
+# Cache settings for rate limiting
+CACHES = {
+    'default': {
+        'BACKEND': os.environ.get('CACHE_BACKEND', 'django.core.cache.backends.memcached.PyMemcacheCache'),
+        'LOCATION': os.environ.get('CACHE_LOCATION', '127.0.0.1:11211'),
+    }
+}
+
+# AI Service settings
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+AI_SERVICE = {
+    'MODEL': os.environ.get('AI_SERVICE_MODEL', 'gpt-4'),
+    'MAX_TOKENS': int(os.environ.get('AI_MAX_TOKENS', 2000)),
+    'TEMPERATURE': float(os.environ.get('AI_TEMPERATURE', 0.7)),
 }
