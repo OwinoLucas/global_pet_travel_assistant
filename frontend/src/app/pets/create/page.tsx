@@ -591,7 +591,7 @@ export default function CreatePetPage() {
           <div className="flex justify-between mt-6">
             <button
               type="button"
-              onClick={handlePrev}
+              onClick={handlePrevious}
               className="text-sm font-medium text-primary hover:text-primary-600"
               disabled={currentStep === 0}
             >

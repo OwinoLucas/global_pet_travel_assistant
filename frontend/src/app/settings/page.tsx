@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 // User profile type
@@ -40,19 +40,6 @@ interface TravelPreferences {
   advanceNotice: number; // days
 }
 
-// Mock user data
-const MOCK_USER: UserProfile = {
-  id: 'user123',
-  name: 'John Smith',
-  email: 'john@example.com',
-  phone: '+1 (555) 123-4567',
-  address: '123 Main St, Boston, MA, 02110',
-  imageUrl: '/placeholder-user.jpg',
-  createdAt: '2024-01-15',
-  timeZone: 'America/New_York',
-  language: 'en-US'
-};
-
 // Mock notification preferences
 const MOCK_NOTIFICATIONS: NotificationPreferences = {
   email: {
@@ -82,7 +69,6 @@ type SettingsTab = 'profile' | 'notifications' | 'account' | 'travel';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const [user, setUser] = useState<UserProfile>(MOCK_USER);
   const [notifications, setNotifications] = useState<NotificationPreferences>(MOCK_NOTIFICATIONS);
   const [travelPreferences, setTravelPreferences] = useState<TravelPreferences>(MOCK_TRAVEL_PREFERENCES);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -91,6 +77,25 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/settings');
+        const data = await res.json();
+        setUser(data);
+      } catch (err) {
+        console.error('Failed to fetch user data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -102,20 +107,26 @@ export default function SettingsPage() {
   };
 
   // Handle profile form submission
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveStatus('saving');
-    
-    // Simulate API call
-    setTimeout(() => {
+  
+    try {
+      const res = await fetch('/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+  
+      if (!res.ok) throw new Error('Error saving data.');
+  
       setSaveStatus('success');
-      
-      // Reset status after a delay
-      setTimeout(() => {
-        setSaveStatus('idle');
-      }, 3000);
-    }, 1000);
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err) {
+      setSaveStatus('error');
+    }
   };
+  
 
   // Handle notification toggle
   const handleNotificationToggle = (
@@ -162,7 +173,7 @@ export default function SettingsPage() {
       return;
     }
     
-    // Simulate API call
+    // Simulate call
     setTimeout(() => {
       setPasswordSuccess('Password updated successfully');
       setCurrentPassword('');
@@ -227,8 +238,8 @@ export default function SettingsPage() {
                 <div className="flex flex-col items-center space-y-4">
                   <div className="relative h-32 w-32 rounded-full overflow-hidden border border-border">
                     <Image
-                      src={user.imageUrl}
-                      alt={user.name}
+                      src={user?.imageUrl || "/media/user.jpg"}
+                      alt={user?.name || "User profile picture"} 
                       fill
                       style={{ objectFit: 'cover' }}
                     />
@@ -252,8 +263,8 @@ export default function SettingsPage() {
                       type="text"
                       id="name"
                       className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                      value={user.name}
-                      onChange={(e) => setUser({ ...user, name: e.target.value })}
+                      value={user?.name}
+                      onChange={(e) => setUser({ ...user!, name: e.target.value })}
                     />
                   </div>
   
@@ -266,8 +277,8 @@ export default function SettingsPage() {
                       type="email"
                       id="email"
                       className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                      value={user.email}
-                      onChange={(e) => setUser({ ...user, email: e.target.value })}
+                      value={user?.email}
+                      onChange={(e) => setUser({ ...user!, email: e.target.value })}
                     />
                   </div>
   
@@ -280,8 +291,8 @@ export default function SettingsPage() {
                       type="tel"
                       id="phone"
                       className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                      value={user.phone || ''}
-                      onChange={(e) => setUser({ ...user, phone: e.target.value })}
+                      value={user?.phone || ''}
+                      onChange={(e) => setUser({ ...user!, phone: e.target.value })}
                     />
                   </div>
   
@@ -294,8 +305,8 @@ export default function SettingsPage() {
                       id="address"
                       rows={3}
                       className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                      value={user.address || ''}
-                      onChange={(e) => setUser({ ...user, address: e.target.value })}
+                      value={user?.address || ''}
+                      onChange={(e) => setUser({ ...user!, address: e.target.value })}
                     />
                   </div>
   
@@ -308,8 +319,8 @@ export default function SettingsPage() {
                       <select
                         id="timezone"
                         className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-card"
-                        value={user.timeZone}
-                        onChange={(e) => setUser({ ...user, timeZone: e.target.value })}
+                        value={user?.timeZone}
+                        onChange={(e) => setUser({ ...user!, timeZone: e.target.value })}
                       >
                         <option value="America/New_York">Eastern Time (ET)</option>
                         <option value="America/Chicago">Central Time (CT)</option>
@@ -328,8 +339,8 @@ export default function SettingsPage() {
                       <select
                         id="language"
                         className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary bg-card"
-                        value={user.language}
-                        onChange={(e) => setUser({ ...user, language: e.target.value })}
+                        value={user?.language}
+                        onChange={(e) => setUser({ ...user!, language: e.target.value })}
                       >
                         <option value="en-US">English (US)</option>
                         <option value="en-GB">English (UK)</option>
@@ -344,7 +355,7 @@ export default function SettingsPage() {
                   {/* Account Info */}
                   <div className="pt-4 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                      Member since {formatDate(user.createdAt)}
+                      Member since {formatDate(user?.createdAt!)}
                     </p>
                   </div>
                 </div>
@@ -543,8 +554,8 @@ export default function SettingsPage() {
                   <h3 className="text-md font-medium">Preferred Airline</h3>
                   <select
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                    value={user.preferredAirline || ''}
-                    onChange={(e) => setUser({ ...user, preferredAirline: e.target.value })}
+                    value={user?.preferredAirline || ''}
+                    onChange={(e) => setUser({ ...user!, preferredAirline: e.target.value })}
                   >
                     <option value="">Select Airline</option>
                     <option value="airline1">Airline 1</option>
